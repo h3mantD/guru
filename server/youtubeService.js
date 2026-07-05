@@ -2,12 +2,10 @@ const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3'
 
 const PERSONA_CHANNELS = {
   hitesh: {
-    handles: ['@HiteshCodeLab', '@chaiaurcode'],
-    fallbackKeywords: ['javascript', 'ai', 'devops', 'dsa', 'sql']
+    handles: ['@HiteshCodeLab', '@chaiaurcode']
   },
   piyush: {
-    handle: '@piyushgargdev',
-    fallbackKeywords: ['backend', 'system design', 'full stack']
+    handle: '@piyushgargdev'
   }
 }
 
@@ -18,6 +16,8 @@ const TECH_KEYWORDS = [
   'aws',
   'backend',
   'cache',
+  'caching',
+  'cdn',
   'cloud',
   'database',
   'deployment',
@@ -41,13 +41,27 @@ const TECH_KEYWORDS = [
   'redis',
   's3',
   'session',
+  'socket',
+  'sockets',
   'sql',
   'system design',
   'testing',
   'typescript',
   'voip',
-  'websocket'
+  'websocket',
+  'websockets'
 ]
+
+const KEYWORD_EXPANSIONS = {
+  cache: ['caching', 'redis', 'cdn'],
+  caching: ['cache', 'redis', 'cdn'],
+  socket: ['sockets', 'websocket', 'websockets'],
+  sockets: ['socket', 'websocket', 'websockets'],
+  websocket: ['websockets', 'socket', 'sockets', 'redis'],
+  websockets: ['websocket', 'socket', 'sockets', 'redis']
+}
+
+const RECOMMENDATION_INTENT_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini'
 
 function getApiKey(apiKey = process.env.YT_API_KEY) {
   if (!apiKey) {
@@ -55,6 +69,21 @@ function getApiKey(apiKey = process.env.YT_API_KEY) {
   }
 
   return apiKey
+}
+
+function uniqueValues(values, limit = 8) {
+  const unique = []
+
+  values
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)
+    .forEach((value) => {
+      if (!unique.includes(value)) {
+        unique.push(value)
+      }
+    })
+
+  return unique.slice(0, limit)
 }
 
 function getPersonaConfig(personaId) {
@@ -270,31 +299,154 @@ function buildKeyContext(messages = []) {
     .toLowerCase()
 }
 
-export function extractChatIntent(messages = [], personaId) {
-  const keyContext = buildKeyContext(messages)
+function buildRoleContext(messages = [], role) {
+  return messages
+    .filter((message) => message?.role === role)
+    .map((message) => message.content || '')
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(-1200)
+    .toLowerCase()
+}
 
-  const uniqueKeywords = TECH_KEYWORDS
+function extractKeywordItems(text) {
+  return TECH_KEYWORDS
     .map((keyword) => ({
       keyword,
-      position: findKeywordPosition(keyContext, keyword)
+      position: findKeywordPosition(text, keyword)
     }))
     .filter((item) => item.position >= 0)
     .sort((first, second) => first.position - second.position)
-    .map((item) => item.keyword)
+}
+
+function expandKeywords(keywords) {
+  const expanded = []
+
+  keywords.forEach((keyword) => {
+    if (!expanded.includes(keyword)) {
+      expanded.push(keyword)
+    }
+
+    ;(KEYWORD_EXPANSIONS[keyword] || []).forEach((relatedKeyword) => {
+      if (!expanded.includes(relatedKeyword)) {
+        expanded.push(relatedKeyword)
+      }
+    })
+  })
+
+  return expanded
+}
+
+function parseJsonObject(value = '') {
+  try {
+    return JSON.parse(value)
+  } catch (error) {
+    const match = String(value).match(/\{[\s\S]*\}/u)
+
+    if (!match) {
+      return null
+    }
+
+    try {
+      return JSON.parse(match[0])
+    } catch (parseError) {
+      return null
+    }
+  }
+}
+
+function normalizeAiVideoIntent(data, fallbackIntent) {
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+
+  const searchQueries = uniqueValues(data.searchQueries || data.queries || [], 6)
+  const requiredTerms = uniqueValues(data.requiredTerms || data.keywords || [], 10)
+  const excludeTerms = uniqueValues(data.excludeTerms || [], 8)
+
+  if (searchQueries.length === 0 && requiredTerms.length === 0) {
+    return null
+  }
+
+  const keywords = uniqueValues([...requiredTerms, ...fallbackIntent.keywords], 12)
+  const queries = searchQueries.length > 0 ? searchQueries : [keywords.join(' ')]
+
+  return {
+    ...fallbackIntent,
+    source: 'ai',
+    primaryTopic: String(data.primaryTopic || queries[0] || fallbackIntent.query).trim(),
+    query: queries[0],
+    queries,
+    keywords,
+    excludeTerms
+  }
+}
+
+export async function generateVideoSearchIntent({
+  openai,
+  model = RECOMMENDATION_INTENT_MODEL,
+  messages = [],
+  fallbackIntent
+} = {}) {
+  if (!openai || fallbackIntent.keywords.length === 0) {
+    return fallbackIntent
+  }
+
+  const response = await openai.responses.create({
+    model,
+    instructions: [
+      'Generate YouTube search intent for finding relevant creator tutorial videos.',
+      'Use only the supplied chat context and existing keywords.',
+      'Return strict JSON with primaryTopic, searchQueries, requiredTerms, and excludeTerms.',
+      'searchQueries must contain 3 to 6 concise YouTube search phrases.',
+      'requiredTerms must contain 3 to 8 concrete topic terms that video title, description, or tags should match.',
+      'Do not include broad creator/persona terms unless they are the actual topic.'
+    ].join('\n'),
+    input: [
+      {
+        role: 'user',
+        content: JSON.stringify({
+          existingKeywords: fallbackIntent.keywords,
+          chatContext: fallbackIntent.keyContext,
+          recentMessages: messages.slice(-8)
+        })
+      }
+    ]
+  })
+  const parsedIntent = normalizeAiVideoIntent(
+    parseJsonObject(response.output_text || ''),
+    fallbackIntent
+  )
+
+  return parsedIntent || fallbackIntent
+}
+
+export function extractChatIntent(messages = [], personaId) {
+  const keyContext = buildKeyContext(messages)
+  const userContext = buildRoleContext(messages, 'user')
+  const userKeywords = extractKeywordItems(userContext).map((item) => item.keyword)
+  const allKeywords = extractKeywordItems(keyContext).map((item) => item.keyword)
+  const baseKeywords = userKeywords.length > 0 ? userKeywords : allKeywords
+  const uniqueKeywords = expandKeywords(baseKeywords)
 
   if (uniqueKeywords.length > 0) {
     return {
+      source: 'deterministic',
       query: uniqueKeywords.join(' '),
+      queries: [uniqueKeywords.join(' ')],
       keywords: uniqueKeywords,
+      excludeTerms: [],
       keyContext
     }
   }
 
-  const fallbackKeywords = PERSONA_CHANNELS[personaId]?.fallbackKeywords || ['coding', 'software']
-
   return {
-    query: fallbackKeywords.join(' '),
-    keywords: fallbackKeywords,
+    source: 'deterministic',
+    query: '',
+    queries: [],
+    keywords: [],
+    excludeTerms: [],
     keyContext
   }
 }
@@ -311,10 +463,14 @@ export function getVideoRelevance(video, intent) {
   const matchedKeywords = intent.keywords.filter((keyword) =>
     findKeywordPosition(searchableText, keyword) >= 0
   )
+  const excludedTerms = (intent.excludeTerms || []).filter((term) =>
+    findKeywordPosition(searchableText, term) >= 0
+  )
 
   return {
-    score: matchedKeywords.length,
-    matchedKeywords
+    score: excludedTerms.length > 0 ? 0 : matchedKeywords.length,
+    matchedKeywords,
+    excludedTerms
   }
 }
 
@@ -355,25 +511,49 @@ export async function fetchRecommendedVideos({
   personaId,
   messages,
   maxResults = 4,
-  fetchImpl = fetch
+  fetchImpl = fetch,
+  openai
 }) {
   const resolvedApiKey = getApiKey(apiKey)
   const config = getPersonaConfig(personaId)
-  const intent = extractChatIntent(messages, personaId)
+  const fallbackIntent = extractChatIntent(messages, personaId)
+  let intent = fallbackIntent
+
+  try {
+    intent = await generateVideoSearchIntent({
+      openai,
+      messages,
+      fallbackIntent
+    })
+  } catch (error) {
+    intent = fallbackIntent
+  }
+
+  if (intent.keywords.length === 0) {
+    return {
+      personaId,
+      intent,
+      videos: []
+    }
+  }
+
+  const searchQueries = intent.queries?.length ? intent.queries : [intent.query]
   const channelIds = await fetchChannelIds({
     config,
     apiKey: resolvedApiKey,
     fetchImpl
   })
   const searchResults = await Promise.all(
-    channelIds.map((channelId) =>
-      searchChannelVideos({
-        apiKey: resolvedApiKey,
-        channelId,
-        query: intent.query,
-        maxResults: Math.max(maxResults * 2, 8),
-        fetchImpl
-      })
+    channelIds.flatMap((channelId) =>
+      searchQueries.map((query) =>
+        searchChannelVideos({
+          apiKey: resolvedApiKey,
+          channelId,
+          query,
+          maxResults: Math.max(maxResults, 4),
+          fetchImpl
+        })
+      )
     )
   )
   const videos = searchResults.flat()

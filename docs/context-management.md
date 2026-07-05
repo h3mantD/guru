@@ -1,6 +1,6 @@
 # Context Management
 
-Guru uses recent-message context plus a compact earlier-conversation recap for chat responses. Video recommendations use compact keyword context from the conversation.
+Guru uses recent-message context plus a compact earlier-conversation recap for chat responses. Video recommendations use AI-assisted search intent with deterministic keyword fallback.
 
 ## Chat Response Strategy
 
@@ -34,10 +34,13 @@ The backend then:
 
 1. Cleans the messages with the same recent-message trimming logic
 2. Builds a compact key context from user and assistant messages
-3. Extracts technical keywords such as Redis, WebSocket, SQL, JWT, Docker, backend, or system design
-4. Searches only the selected creator's configured channel or channels
-5. Fetches video details for the search results
-6. Keeps only videos whose title, description, or tags match the extracted context
+3. Extracts deterministic technical keywords such as Redis, WebSocket, SQL, JWT, Docker, backend, or system design
+4. Asks the LLM for 3-6 focused YouTube search phrases, required topic terms, and terms to exclude
+5. Searches only the selected creator's configured channel or channels
+6. Fetches video details for the search results
+7. Keeps only videos whose title, description, or tags match the required topic terms and do not match excluded terms
+
+If the LLM search-intent step is unavailable, the backend falls back to the deterministic keywords. If no concrete topic is found, it returns no recommendations instead of broad creator videos.
 
 This logic lives in `server/youtubeService.js`.
 

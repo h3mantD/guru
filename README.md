@@ -172,7 +172,7 @@ Content-Type: application/json
 }
 ```
 
-Builds a key context from the chat, extracts technical keywords, searches the selected creator's configured channel or channels, fetches video details, cross-checks relevance, and returns only videos that match the conversation.
+Builds key context from the chat, asks the LLM for focused YouTube search phrases and required topic terms, falls back to deterministic keywords when needed, searches the selected creator's configured channel or channels, fetches video details, cross-checks relevance, and returns only videos that match the conversation.
 
 ```http
 POST /api/youtube/video-details
@@ -219,7 +219,7 @@ docs/
 
 - Persona data preparation: summarized in this README.
 - [Prompt strategy](docs/prompt-strategy.md): explains the roleplay prompt layers, style boundaries, answer-depth handling, and YouTube tool prompting.
-- [Context management](docs/context-management.md): explains chat memory recap, recent-message handling, and keyword context extraction for video recommendations.
+- [Context management](docs/context-management.md): explains chat memory recap, recent-message handling, and AI-assisted video search intent.
 - [Sample conversations](docs/sample-conversations.md): demonstrates Practical Guru and Builder Guru conversations.
 
 ## Testing And Verification
@@ -248,7 +248,7 @@ The UI has also been checked manually with Playwright at desktop and mobile widt
 - API secrets stay server-side.
 - Built app is served by Express.
 - Mobile layout includes a closable video resources tray.
-- Suggested videos are based on full chat context and relevance checks.
+- Suggested videos use AI-assisted search intent from the full chat plus metadata relevance checks.
 - YouTube video review verifies creator channel ownership before showing metadata.
 
 ## Limitations

@@ -55,6 +55,6 @@ Roleplay prompting is enough for this app because:
 
 ## YouTube Tool Prompting
 
-The YouTube recommendation tool does not blindly suggest videos. It first builds key context from the full chat, extracts technical keywords, searches only the selected creator's configured channels, fetches video details, and keeps only videos whose title, description, or tags match the conversation.
+The YouTube recommendation tool does not blindly suggest videos. It first builds key context from the full chat, extracts deterministic technical keywords, asks the LLM for focused YouTube search phrases and required topic terms, then searches only the selected creator's configured channels. After YouTube returns results, the backend fetches video details and keeps only videos whose title, description, or tags match the required topic terms. If the LLM search-intent step is unavailable, the deterministic keywords are used as the fallback.
 
 For direct video review requests, the app verifies that the video belongs to the selected creator channel. The response is careful to say that YouTube metadata is available, but transcript-level review needs transcript text.

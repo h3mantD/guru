@@ -1,8 +1,20 @@
 const QUICK_ACTIONS = {
-  simple: 'Explain the previous answer more simply.',
-  example: 'Give a real-world example for the previous answer.',
-  code: 'Show a small code example for the previous answer.',
-  quiz: 'Give me a short quiz for the previous answer.'
+  simple: {
+    previous: 'Explain the previous answer more simply.',
+    topic: 'Explain this topic more simply.'
+  },
+  example: {
+    previous: 'Give a real-world example for the previous answer.',
+    topic: 'Give a real-world example for this topic.'
+  },
+  code: {
+    previous: 'Show a small code example for the previous answer.',
+    topic: 'Show a small code example for this topic.'
+  },
+  quiz: {
+    previous: 'Give me a short quiz for the previous answer.',
+    topic: 'Give me a short quiz for this topic.'
+  }
 }
 
 const QUICK_ACTION_ALIASES = {
@@ -88,17 +100,24 @@ function normalizeQuickActionId(actionId = '') {
 
 export function buildQuickActionMessage(actionId, context, extraPrompt = '') {
   const normalizedActionId = normalizeQuickActionId(actionId)
-  const instruction = QUICK_ACTIONS[normalizedActionId]
+  const action = QUICK_ACTIONS[normalizedActionId]
   const cleanContext = context?.trim() || 'Use the previous assistant answer as context.'
   const cleanExtraPrompt = extraPrompt?.trim()
 
-  if (!instruction) {
+  if (!action) {
     throw new Error(`Unknown quick action: ${actionId}`)
   }
 
+  if (cleanExtraPrompt) {
+    return [
+      action.topic,
+      'Topic:',
+      cleanExtraPrompt
+    ].join('\n')
+  }
+
   return [
-    instruction,
-    cleanExtraPrompt ? `User added: ${cleanExtraPrompt}` : '',
+    action.previous,
     'Use the context below. Do not ask the user to repeat it.',
     '',
     cleanContext

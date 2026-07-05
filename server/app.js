@@ -27,7 +27,11 @@ export function createApp({ chatService, youtubeService } = {}) {
   const activeYouTubeService = youtubeService || {
     fetchCreatorVideoDetails,
     fetchLatestPersonaVideos,
-    fetchRecommendedVideos
+    fetchRecommendedVideos: (payload) =>
+      fetchRecommendedVideos({
+        ...payload,
+        openai: process.env.OPENAI_API_KEY ? createOpenAIClient() : undefined
+      })
   }
 
   app.use(express.json({ limit: '1mb' }))
