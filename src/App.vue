@@ -12,10 +12,12 @@ import {
   sendChatMessage
 } from './api/chatApi'
 import {
-  buildQuickActionMessage,
+  expandQuickActionCommand,
   extractYouTubeUrl,
   formatVideoDetailsReply,
   getDepthLabel,
+  getQuickActionContext,
+  getQuickActionCommand,
   getWelcomeMessage,
   wantsCreatorVideoDetails
 } from './chatActions'
@@ -103,10 +105,7 @@ const showMobileVideoResources = computed(
   () => hasVideoResourceContent.value && !mobileResourcesDismissed.value
 )
 
-const latestUserTopic = computed(() => {
-  const latestUserMessage = [...messages.value].reverse().find((message) => message.role === 'user')
-  return latestUserMessage?.content || 'the current topic'
-})
+const quickActionContext = computed(() => getQuickActionContext(messages.value))
 
 const suggestedPrompts = computed(() => {
   if (selectedPersonaId.value === 'hitesh') {
@@ -125,10 +124,10 @@ const suggestedPrompts = computed(() => {
 })
 
 const quickActions = [
-  { id: 'simpler', icon: ListMinus, label: 'Simpler' },
-  { id: 'example', icon: BookOpenCheck, label: 'Example' },
-  { id: 'code', icon: Code2, label: 'Code' },
-  { id: 'quiz', icon: CircleQuestionMark, label: 'Quiz' }
+  { id: 'simple', icon: ListMinus, label: '@simple' },
+  { id: 'example', icon: BookOpenCheck, label: '@example' },
+  { id: 'code', icon: Code2, label: '@code' },
+  { id: 'quiz', icon: CircleQuestionMark, label: '@quiz' }
 ]
 
 onMounted(async () => {
@@ -231,10 +230,18 @@ async function sendContent(content) {
       return
     }
 
+    const apiMessages = [
+      ...messages.value.slice(0, -1),
+      {
+        role: 'user',
+        content: expandQuickActionCommand(cleanContent, messages.value.slice(0, -1))
+      }
+    ]
+
     const reply = await sendChatMessage({
       personaId: selectedPersonaId.value,
       answerDepth: answerDepth.value,
-      messages: nextMessages
+      messages: apiMessages
     })
 
     messages.value = [
@@ -264,7 +271,7 @@ async function sendContent(content) {
 }
 
 function handleQuickAction(actionId) {
-  sendContent(buildQuickActionMessage(actionId, latestUserTopic.value))
+  sendContent(getQuickActionCommand(actionId))
 }
 
 async function suggestVideos() {

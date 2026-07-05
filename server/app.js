@@ -1,7 +1,7 @@
 import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
-import { trimMessages } from './context.js'
+import { cleanMessages } from './context.js'
 import { createChatService } from './chatService.js'
 import { createOpenAIClient } from './openaiClient.js'
 import { getPersona, listPersonas } from './personas.js'
@@ -45,14 +45,14 @@ export function createApp({ chatService, youtubeService } = {}) {
       const { personaId, messages, answerDepth } = req.body || {}
       getPersona(personaId)
 
-      const cleanMessages = trimMessages(messages)
-      if (cleanMessages.length === 0) {
+      const sanitizedMessages = cleanMessages(messages)
+      if (sanitizedMessages.length === 0) {
         return res.status(400).json({ error: 'Please send at least one message.' })
       }
 
       const reply = await activeChatService({
         personaId,
-        messages: cleanMessages,
+        messages: sanitizedMessages,
         answerDepth
       })
 
@@ -81,14 +81,14 @@ export function createApp({ chatService, youtubeService } = {}) {
       const { personaId, messages } = req.body || {}
       getPersona(personaId)
 
-      const cleanMessages = trimMessages(messages)
-      if (cleanMessages.length === 0) {
+      const sanitizedMessages = cleanMessages(messages)
+      if (sanitizedMessages.length === 0) {
         return res.status(400).json({ error: 'Please send at least one message.' })
       }
 
       const result = await activeYouTubeService.fetchRecommendedVideos({
         personaId,
-        messages: cleanMessages
+        messages: sanitizedMessages
       })
 
       res.json(result)

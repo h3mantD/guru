@@ -56,7 +56,7 @@ Each profile includes:
 - Vocabulary and speech-style hints
 - Boundaries to keep the app as a learning simulation
 
-The app stores these profiles in `server/personas.js` and sends only the selected profile with the recent chat history when generating a reply.
+The app stores these profiles in `server/personas.js` and sends the selected profile with a compact chat recap and recent chat history when generating a reply.
 
 ## Requirements
 
@@ -219,7 +219,7 @@ docs/
 
 - Persona data preparation: summarized in this README.
 - [Prompt strategy](docs/prompt-strategy.md): explains the roleplay prompt layers, style boundaries, answer-depth handling, and YouTube tool prompting.
-- [Context management](docs/context-management.md): explains recent-message trimming for chat and keyword context extraction for video recommendations.
+- [Context management](docs/context-management.md): explains chat memory recap, recent-message handling, and keyword context extraction for video recommendations.
 - [Sample conversations](docs/sample-conversations.md): demonstrates Practical Guru and Builder Guru conversations.
 
 ## Testing And Verification

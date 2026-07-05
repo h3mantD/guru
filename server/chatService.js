@@ -1,4 +1,4 @@
-import { trimMessages } from './context.js'
+import { buildConversationContext } from './context.js'
 import { getPersona } from './personas.js'
 import {
   buildSpeechStyleGuidance,
@@ -19,7 +19,7 @@ const DEPTH_GUIDANCE = {
 export function createChatService({ openai, model = process.env.OPENAI_MODEL || 'gpt-4.1-mini' }) {
   return async function chatService({ personaId, messages, answerDepth = 'normal' }) {
     const persona = getPersona(personaId)
-    const trimmedMessages = trimMessages(messages)
+    const conversationContext = buildConversationContext(messages)
     const depthGuidance = DEPTH_GUIDANCE[answerDepth] || DEPTH_GUIDANCE.normal
 
     const instructions = [
@@ -35,6 +35,14 @@ export function createChatService({ openai, model = process.env.OPENAI_MODEL || 
       '',
       buildVocabularyGuidance(persona),
       '',
+      conversationContext.earlierSummary
+        ? [
+            'Earlier conversation context to preserve across turns:',
+            conversationContext.earlierSummary,
+            'Use this recap only for continuity. Prioritize the latest user request.'
+          ].join('\n')
+        : '',
+      conversationContext.earlierSummary ? '' : '',
       depthGuidance,
       '',
       'Keep responses concise unless the user asks for depth. Format code clearly when code helps.'
@@ -43,7 +51,7 @@ export function createChatService({ openai, model = process.env.OPENAI_MODEL || 
     const response = await openai.responses.create({
       model,
       instructions,
-      input: trimmedMessages.map((message) => ({
+      input: conversationContext.recentMessages.map((message) => ({
         role: message.role,
         content: message.content
       }))

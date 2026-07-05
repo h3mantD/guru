@@ -1,8 +1,13 @@
 const QUICK_ACTIONS = {
-  simpler: (topic) => `Explain this more simply: ${topic}`,
-  example: (topic) => `Give me a real-world example for this: ${topic}`,
-  code: (topic) => `Show a small code example for this: ${topic}`,
-  quiz: (topic) => `Give me a short quiz to check my understanding of this: ${topic}`
+  simple: 'Explain the previous answer more simply.',
+  example: 'Give a real-world example for the previous answer.',
+  code: 'Show a small code example for the previous answer.',
+  quiz: 'Give me a short quiz for the previous answer.'
+}
+
+const QUICK_ACTION_ALIASES = {
+  simpler: 'simple',
+  quick: 'quiz'
 }
 
 const WELCOME_MESSAGES = {
@@ -75,15 +80,95 @@ function formatViewCount(viewCount) {
   return `${count} views`
 }
 
-export function buildQuickActionMessage(actionId, topic) {
-  const cleanTopic = topic?.trim() || 'the current topic'
-  const buildMessage = QUICK_ACTIONS[actionId]
+function normalizeQuickActionId(actionId = '') {
+  const cleanActionId = String(actionId).trim().toLowerCase().replace(/^@/u, '')
 
-  if (!buildMessage) {
+  return QUICK_ACTION_ALIASES[cleanActionId] || cleanActionId
+}
+
+export function buildQuickActionMessage(actionId, context, extraPrompt = '') {
+  const normalizedActionId = normalizeQuickActionId(actionId)
+  const instruction = QUICK_ACTIONS[normalizedActionId]
+  const cleanContext = context?.trim() || 'Use the previous assistant answer as context.'
+  const cleanExtraPrompt = extraPrompt?.trim()
+
+  if (!instruction) {
     throw new Error(`Unknown quick action: ${actionId}`)
   }
 
-  return buildMessage(cleanTopic)
+  return [
+    instruction,
+    cleanExtraPrompt ? `User added: ${cleanExtraPrompt}` : '',
+    'Use the context below. Do not ask the user to repeat it.',
+    '',
+    cleanContext
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+export function getQuickActionCommand(actionId) {
+  const normalizedActionId = normalizeQuickActionId(actionId)
+
+  if (!QUICK_ACTIONS[normalizedActionId]) {
+    throw new Error(`Unknown quick action: ${actionId}`)
+  }
+
+  return `@${normalizedActionId}`
+}
+
+export function parseQuickActionCommand(content = '') {
+  const match = String(content).trim().match(/^@([a-z]+)(?:\s+([\s\S]*))?$/iu)
+
+  if (!match) {
+    return null
+  }
+
+  const actionId = normalizeQuickActionId(match[1])
+  if (!QUICK_ACTIONS[actionId]) {
+    return null
+  }
+
+  return {
+    actionId,
+    extraPrompt: match[2]?.trim() || ''
+  }
+}
+
+export function expandQuickActionCommand(content, messages = []) {
+  const command = parseQuickActionCommand(content)
+
+  if (!command) {
+    return content
+  }
+
+  return buildQuickActionMessage(
+    command.actionId,
+    getQuickActionContext(messages),
+    command.extraPrompt
+  )
+}
+
+export function getQuickActionContext(messages = []) {
+  if (!Array.isArray(messages)) {
+    return 'the previous answer'
+  }
+
+  const latestAssistantIndex = messages.findLastIndex((message) => message?.role === 'assistant')
+  if (latestAssistantIndex < 0) {
+    return 'the previous answer'
+  }
+
+  const latestAssistant = messages[latestAssistantIndex]
+  const userPrompt = messages
+    .slice(0, latestAssistantIndex)
+    .findLast((message) => message?.role === 'user')
+  const parts = [
+    userPrompt?.content ? `User asked: ${userPrompt.content}` : '',
+    latestAssistant?.content ? `Assistant answered: ${latestAssistant.content}` : ''
+  ].filter(Boolean)
+
+  return parts.join('\n\n') || 'the previous answer'
 }
 
 export function extractYouTubeUrl(content) {

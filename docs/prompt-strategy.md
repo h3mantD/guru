@@ -51,7 +51,7 @@ Roleplay prompting is enough for this app because:
 - the persona data is small
 - the app only supports two personas
 - the goal is style simulation, not exact factual recall
-- context can be handled with recent chat history
+- context can be handled with a compact earlier-chat recap plus recent chat history
 
 ## YouTube Tool Prompting
 

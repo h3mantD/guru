@@ -1,6 +1,6 @@
 # Context Management
 
-Guru uses recent-message context for chat responses and compact keyword context for YouTube recommendations.
+Guru uses recent-message context plus a compact earlier-conversation recap for chat responses. Video recommendations use compact keyword context from the conversation.
 
 ## Chat Response Strategy
 
@@ -11,11 +11,20 @@ The backend then:
 1. Removes unsupported roles such as `system`
 2. Trims whitespace
 3. Drops empty messages
-4. Keeps only the latest 12 messages
+4. Builds a compact recap from older turns when the chat is long
+5. Keeps the latest 12 messages as the live message window
 
 This logic lives in `server/context.js`.
 
-The cleaned messages are then passed to `server/chatService.js`, which combines them with the selected persona prompt, source basis, speech-style guidance, vocabulary guidance, and answer-depth guidance.
+The cleaned messages are then passed to `server/chatService.js`, which combines:
+
+- the selected persona prompt
+- source basis
+- speech-style guidance
+- vocabulary guidance
+- answer-depth guidance
+- earlier conversation recap when available
+- latest chat turns
 
 ## YouTube Recommendation Strategy
 
@@ -36,14 +45,10 @@ For direct video-detail requests, the backend extracts the YouTube video ID and 
 
 ## Long Conversations
 
-For longer chats, only the latest messages are sent to the model. This keeps the request small and helps the app stay simple.
+For longer chats, Guru sends the latest messages and a compact recap of older turns. This keeps important earlier details available without sending the entire chat every time.
 
-Trade-off:
-
-- Good: easy to understand and maintain
-- Good: avoids token growth
-- Limitation: older conversation details can be forgotten
+The recap keeps track of useful continuity details such as the user's goal, selected stack, constraints, decisions already made, and earlier examples. The latest messages still stay separate so the assistant can prioritize the current question.
 
 ## Future Improvement
 
-A later version could add a short running summary when the chat gets long.
+A later version could store the recap in the browser so it can survive a page refresh.
