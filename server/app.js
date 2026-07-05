@@ -1,7 +1,6 @@
 import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { trimMessages } from './context.js'
 import { createChatService } from './chatService.js'
 import { createOpenAIClient } from './openaiClient.js'
@@ -12,9 +11,7 @@ import {
   fetchRecommendedVideos
 } from './youtubeService.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const distPath = path.resolve(__dirname, '../dist')
+const distPath = path.resolve(process.cwd(), 'dist')
 
 export function createApp({ chatService, youtubeService } = {}) {
   const app = express()

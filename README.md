@@ -9,7 +9,7 @@ The app is an educational simulation. It does not claim to be, represent, or spe
 
 ## Submission Links
 
-- Live website: add deployed URL here
+- Live website: https://guru.thetechkage.com/
 - Public GitHub repository: add repository URL here
 
 ## What It Does
@@ -90,13 +90,7 @@ npm install
 
 ## Run Locally
 
-Start the backend:
-
-```bash
-npm run server
-```
-
-Start the Vite dev server in another terminal:
+Start the API and Vite dev server together:
 
 ```bash
 npm run dev
@@ -106,6 +100,13 @@ Open the Vite URL shown in the terminal, usually:
 
 ```text
 http://localhost:5173
+```
+
+If you need to run the frontend and backend separately:
+
+```bash
+npm run server
+npm run dev:web
 ```
 
 Vite proxies `/api/*` requests to `http://localhost:3000`.
